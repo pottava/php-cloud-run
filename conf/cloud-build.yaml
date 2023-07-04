@@ -1,0 +1,8 @@
+steps:
+- name: 'gcr.io/kaniko-project/executor:latest'
+  args: ['--destination=asia-northeast1-docker.pkg.dev/$PROJECT_ID/my-apps/app:$SHORT_SHA',
+         '--dockerfile=conf/app.Dockerfile', '--cache=true', '--cache-ttl=1h']
+
+- name: 'gcr.io/kaniko-project/executor:latest'
+  args: ['--destination=asia-northeast1-docker.pkg.dev/$PROJECT_ID/my-apps/web:$SHORT_SHA',
+         '--dockerfile=conf/web.Dockerfile', '--cache=true', '--cache-ttl=1h']
