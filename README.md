@@ -64,7 +64,7 @@ Google Cloud でアプリケーションのテストやビルドを行うため�
 
 ```sh
 gcloud services enable compute.googleapis.com run.googleapis.com \
-    cloudbuild.googleapis.com artifactregistry.googleapis.com 
+    cloudbuild.googleapis.com artifactregistry.googleapis.com
 ```
 
 [Artifact Registry](https://cloud.google.com/artifact-registry?hl=ja) にリポジトリ（成果物置き場）を作り
@@ -78,7 +78,7 @@ gcloud artifacts repositories create my-apps --repository-format "docker" \
 どうやってビルドしているかは設定ファイル (conf/cloud-build.yaml) を確認してみてください。
 
 ```sh
-gcloud builds submit --config conf/cloud-build.yaml --region 'asia-northeast1'
+gcloud builds submit --config conf/cloud-build.yaml --region 'asia-northeast1' --substitutions SHORT_SHA=test
 ```
 
 ## 5. Cloud Run へのデプロイ
@@ -166,6 +166,121 @@ EOF
 ```
 
 CSR に変更したコードを push してみましょう。
+
+```sh
+git add . && git commit -m 'Automate deployment' && git push google main
+```
+
+## 8. データベースの利用
+
+一度 `Ctrl + C` でいったん Docker compose を停止し、MySQL を入れた設定に書き換えます。
+
+```sh
+patch conf/app.Dockerfile diff/app.Dockerfile.diff
+patch compose.yml diff/compose.yml.diff
+patch src/index.php diff/index.php.diff
+```
+
+改めて、ビルドオプションをつけて Docker compose でアプリを起動しつつ、
+
+```sh
+docker compose up --build
+```
+
+別のターミナルからデータベースにデータを入れてみましょう。
+
+```sh
+sudo apt-get install -y mysql-client
+mysql -h 127.0.0.1 -u user -ppass -D app -e "CREATE TABLE colors (id MEDIUMINT NOT NULL AUTO_INCREMENT, name CHAR(32) NOT NULL, PRIMARY KEY (id));"
+mysql -h 127.0.0.1 -u user -ppass -D app -e "INSERT INTO colors (name) VALUES ('White'),('Black'),('Gray');"
+```
+
+ブラウザをリロードします。データベースの内容は表示されたでしょうか？
+
+## 9. Cloud SQL の起動
+
+サービスを有効化し、データベース・インスタンスを作り、ましょう。
+
+```sh
+gcloud services enable sqladmin.googleapis.com
+gcloud sql instances create mysql --region "asia-northeast1" \
+    --database-version "MYSQL_5_7" --tier "db-f1-micro"
+gcloud sql users set-password root --instance "my-sql" \
+    --host '%' --password 'Pa$$w0rd'
+gcloud sql users create user --password pass --instance "my-sql"
+gcloud sql databases create app --instance "my-sql"
+```
+
+[Cloud SQL Auth Proxy]() を利用して、リモートから IAM 認証による接続を試します。  
+ツール用の認証を通し、ツールのインストール & 起動してみましょう。
+
+```sh
+gcloud auth application-default login
+curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.4.0/cloud-sql-proxy.linux.amd64
+chmod +x cloud-sql-proxy
+./cloud-sql-proxy --address 0.0.0.0 --port 1234 "${project_id}:asia-northeast1:my-sql"
+```
+
+ターミナルをもう一つ起動し  
+クラウド上の MySQL にアクセス、ローカル同様のシード値を投入してみます。
+
+```sh
+mysql -h 127.0.0.1 -P 1234 -u root -p -D app
+mysql> CREATE TABLE colors (id MEDIUMINT NOT NULL AUTO_INCREMENT, name CHAR(32) NOT NULL, PRIMARY KEY (id));
+mysql> INSERT INTO colors (name) VALUES ('White'),('Black'),('Gray');
+mysql> SELECT * FROM colors;
+mysql> exit
+```
+
+## 10. Cloud Run からの Cloud SQL 接続
+
+[Secret Manager](https://cloud.google.com/secret-manager?hl=ja) を使い、データベースへの接続情報を安全に管理しましょう。  
+
+```sh
+cat << EOF > mysql-secrets.json
+{
+  "DB_HOST": "$( gcloud sql instances describe my-sql --format 'value(ipAddresses[0].ipAddress)' ):3306",
+  "DB_NAME": "app",
+  "DB_USER": "user",
+  "DB_PASSWORD": "pass"
+}
+EOF
+gcloud services enable secretmanager.googleapis.com
+gcloud secrets create mysql-secrets --replication-policy "automatic" \
+    --data-file mysql-secrets.json
+rm -f mysql-secrets.json
+```
+
+Cloud Run から Cloud SQL に接続を許可するためのサービス アカウントを作り、必要な権限を設定します。
+
+```sh
+gcloud iam service-accounts create my-svc \
+    --display-name "My service's SA" \
+    --description "Service Account for Secret Manager & Cloud SQL client"
+gcloud secrets add-iam-policy-binding mysql-secrets \
+    --member "serviceAccount:my-svc@${project_id}.iam.gserviceaccount.com" \
+    --role roles/secretmanager.secretAccessor
+gcloud projects add-iam-policy-binding "${project_id}" \
+    --member "serviceAccount:my-svc@${project_id}.iam.gserviceaccount.com" \
+    --role "roles/cloudsql.client"
+```
+
+Cloud Build が Cloud Run に渡すサービス アカウントを扱えるよう、権限を追加します。
+
+```sh
+gcloud iam service-accounts add-iam-policy-binding \
+    my-svc@${project_id}.iam.gserviceaccount.com \
+    --member "serviceAccount:${project_number}@cloudbuild.gserviceaccount.com" \
+    --role "roles/iam.serviceAccountUser"
+```
+
+Cloud SQL に接続するための Cloud Run 設定を多少変更します。
+
+```sh
+patch conf/cloud-run.yaml diff/cloud-run.yaml.diff
+```
+
+変更したコードをデプロイしてみましょう。
 
 ```sh
 git add . && git commit -m 'Automate deployment' && git push google main

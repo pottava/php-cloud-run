@@ -1,0 +1,41 @@
+0a1,11
+> <html>
+> <head>
+>     <meta charset="utf-8">
+>     <title>Colors</title>
+>     <style>
+>         body {margin: 20px;}
+>         p {font-size: 1.2rem;}
+>     </style>
+> </head>
+> <body>
+>     <h2>Colors</h2>
+2,3c13,37
+< echo('<pre>');
+< var_export($_SERVER);
+---
+> if ($socket = getenv('MYSQL_SOCKET')) {
+>     $db = new mysqli('localhost', $_ENV['MYSQL_USERNAME'], $_ENV['MYSQL_PASSWORD'], $_ENV['MYSQL_DATABASE'], null, $socket);
+>     if ($db->connect_error) {
+>         echo $db->connect_error;
+>         exit();
+>     }
+> } else {
+>     $db = new mysqli($_ENV['MYSQL_HOSTNAME'], $_ENV['MYSQL_USERNAME'], $_ENV['MYSQL_PASSWORD'], $_ENV['MYSQL_DATABASE']);
+>     if ($db->connect_error) {
+>         echo $db->connect_error;
+>         exit();
+>     }
+> }
+> $db->set_charset("utf8");
+> 
+> if ($rs = $db->query("SELECT id, name FROM colors")) {
+>     while ($row = $rs->fetch_assoc()) {
+>         echo "<p>" . $row["id"] . ", " . $row["name"] . "</p>";
+>     }
+>     $rs->close();
+> }
+> $db->close();
+> ?>
+> </body>
+> </html>

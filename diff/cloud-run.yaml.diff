@@ -1,0 +1,13 @@
+12a13
+>         run.googleapis.com/cloudsql-instances: PROJECT_ID:asia-northeast1:my-sql
+15a17
+>       serviceAccountName: my-svc@PROJECT_ID.iam.gserviceaccount.com
+21a24,31
+>         - name: MYSQL_SOCKET
+>           value: /cloudsql/PROJECT_ID:asia-northeast1:my-sql
+>         - name: MYSQL_USERNAME
+>           value: user
+>         - name: MYSQL_PASSWORD
+>           value: pass
+>         - name: MYSQL_DATABASE
+>           value: app

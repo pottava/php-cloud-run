@@ -1,0 +1,27 @@
+6a7,11
+>     environment:
+>       - MYSQL_HOSTNAME=db
+>       - MYSQL_DATABASE=app
+>       - MYSQL_USERNAME=user
+>       - MYSQL_PASSWORD=pass
+9a15,16
+>     depends_on:
+>       - db
+21a29,45
+> 
+>   db:
+>     image: mysql:5.7
+>     ports:
+>       - 3306:3306
+>     volumes:
+>       - ./conf/my.conf:/etc/mysql/conf.d/my.conf
+>       - db-data:/var/lib/mysql
+>     environment:
+>       - MYSQL_DATABASE=app
+>       - MYSQL_USER=user
+>       - MYSQL_PASSWORD=pass
+>     restart: always
+>     container_name: db
+> 
+> volumes:
+>   db-data:
