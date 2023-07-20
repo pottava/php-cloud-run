@@ -87,8 +87,9 @@ gcloud builds submit --config conf/cloud-build.yaml --region 'asia-northeast1' -
 以下のコマンドで PHP アプリケーションをデプロイしてみます。
 
 ```sh
-sed -ie "s/PROJECT_ID/$( gcloud config get-value project )/g" conf/cloud-run.yaml
-gcloud run services replace conf/cloud-run.yaml --region 'asia-northeast1'
+sed -e "s/PROJECT_ID/$( gcloud config get-value project )/g" conf/cloud-run.yaml \
+    | sed -e "s/COMMIT_SHA/test/g" > cloud-run.yaml
+gcloud run services replace cloud-run.yaml --region 'asia-northeast1'
 ```
 
 外部からのアクセスを許可しつつ
